@@ -1,0 +1,2 @@
+# starguide
+IDFS StarguideAI Code
