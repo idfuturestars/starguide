@@ -1,0 +1,54 @@
+{
+  "name": "IDFS StarGuide",
+  "short_name": "StarGuide",
+  "description": "Learn, Explore, Excel - Your Journey to Excellence",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#667EEA",
+  "background_color": "#667EEA",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    },
+    {
+      "src": "/screenshot2.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Challenge",
+      "url": "/#stargate",
+      "description": "Begin Stargate Challenge"
+    },
+    {
+      "name": "Battle Arena",
+      "url": "/#battle",
+      "description": "Start a battle"
+    },
+    {
+      "name": "AI Tutor",
+      "url": "/#starmentor",
+      "description": "Chat with AI"
+    }
+  ]
+}
