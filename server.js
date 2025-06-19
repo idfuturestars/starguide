@@ -1,146 +1,57 @@
 
-const express = require('express');
-const http = require('http');
-const socketIO = require('socket.io');
-const cors = require('cors');
-const path = require('path');
+/**
+ * IDFS StarGuide Backend Server
+ */
 
-// Initialize Express app
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+
+const requestLogger = require('./src/middleware/requestLogger');
+const errorHandler = require('./src/middleware/errorHandler');
+const authRoutes = require('./src/routes/authRoutes');
+const logger = require('./src/utils/logger');
+
 const app = express();
-const server = http.createServer(app);
-const io = socketIO(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+const PORT = process.env.PORT || 5000;
 
 // Middleware
+app.use(helmet());
 app.use(cors());
-app.use(express.json());
-app.use(express.static('.'));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(requestLogger);
 
-// Store connected users
-let connectedUsers = new Map();
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use('/api', limiter);
 
-// Serve index.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// Routes
+app.use('/api/auth', authRoutes);
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    const uptime = process.uptime();
-    const memoryUsage = process.memoryUsage();
-    
-    res.json({ 
-        status: 'ok', 
-        message: 'IDFS StarGuide server is running',
-        timestamp: new Date().toISOString(),
-        connectedUsers: connectedUsers.size,
-        uptime: Math.floor(uptime),
-        services: {
-            firebase: {
-                admin: true,
-                firestore: true
-            },
-            ai: {
-                openai: !!process.env.OPENAI_API_KEY,
-                claude: !!process.env.CLAUDE_API_KEY,
-                gemini: !!process.env.GEMINI_API_KEY
-            }
-        },
-        memory: {
-            used: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-            total: Math.round(memoryUsage.heapTotal / 1024 / 1024)
-        }
+// 404 handler
+app.use('*', (req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'Route not found'
     });
 });
 
-// API endpoints for user data
-app.get('/api/users/online', (req, res) => {
-    res.json({ count: connectedUsers.size });
-});
-
-app.post('/api/progress', (req, res) => {
-    try {
-        const { userId, progress } = req.body;
-        
-        if (!userId) {
-            return res.status(400).json({ error: 'User ID is required' });
-        }
-        
-        if (!progress) {
-            return res.status(400).json({ error: 'Progress data is required' });
-        }
-        
-        // In a real app, save to database
-        console.log('Progress update for user:', userId, 'with data:', JSON.stringify(progress));
-        res.json({ success: true, message: 'Progress saved' });
-    } catch (error) {
-        console.error('Progress save error:', error);
-        res.status(500).json({ error: 'Failed to save progress' });
-    }
-});
-
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
-    
-    socket.on('userJoined', (userData) => {
-        console.log('User joined:', userData);
-        connectedUsers.set(socket.id, userData);
-        
-        // Broadcast online user count
-        io.emit('onlineUsers', connectedUsers.size);
-    });
-    
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-        connectedUsers.delete(socket.id);
-        
-        // Broadcast updated online user count
-        io.emit('onlineUsers', connectedUsers.size);
-    });
-    
-    socket.on('chatMessage', (data) => {
-        console.log('Chat message:', data);
-        // Broadcast message to all clients
-        io.emit('chatMessage', data);
-    });
-    
-    socket.on('battleInvite', (data) => {
-        console.log('Battle invite:', data);
-        // Send invite to specific user
-        socket.to(data.targetUserId).emit('battleInvite', data);
-    });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
-
-// Handle 404s
-app.use((req, res) => {
-    res.status(404).sendFile(path.join(__dirname, 'index.html'));
-});
+// Error handler
+app.use(errorHandler);
 
 // Start server
-const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0'; // Important: bind to 0.0.0.0 for Replit
-
-server.listen(PORT, HOST, () => {
-    console.log(`🚀 IDFS StarGuide server running on ${HOST}:${PORT}`);
-    console.log(`📱 Access your app at: https://${process.env.REPL_SLUG || 'your-repl'}.${process.env.REPL_OWNER || 'username'}.repl.co`);
+app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`IDFS StarGuide Backend running on port ${PORT}`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('Received SIGTERM, shutting down gracefully');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
+module.exports = app;
